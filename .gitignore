@@ -1,3 +1,4 @@
 .qodo
 encodings_cache.pkl
 known_faces
+__pycache__

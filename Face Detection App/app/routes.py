@@ -10,6 +10,10 @@ router = APIRouter()
 
 known_encs, known_names = [], []
 
+@router.get("/")
+async def func():
+    return {"message": "Welcome to the Face Detection App!"}
+
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
