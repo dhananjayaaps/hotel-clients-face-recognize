@@ -55,6 +55,8 @@ export const getGuestReservations = async (guestId: string): Promise<Reservation
         checkInDate: '2023-12-15',
         checkOutDate: '2023-12-20',
         status: 'confirmed',
+        totalAmount: 0,
+        guestId: ''
       },
       {
         id: 'res2',
@@ -62,6 +64,8 @@ export const getGuestReservations = async (guestId: string): Promise<Reservation
         checkInDate: '2024-01-05',
         checkOutDate: '2024-01-10',
         status: 'pending',
+        totalAmount: 0,
+        guestId: ''
       },
     ];
   } catch (error) {
