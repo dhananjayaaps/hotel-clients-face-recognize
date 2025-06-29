@@ -4,8 +4,13 @@ from app.models import User
 from app.utils.security import get_password_hash, create_access_token, verify_password
 from datetime import timedelta
 from app.db import get_database
+from pydantic import BaseModel
 
 router = APIRouter()
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 @router.post("/register", response_model=UserResponse)
 async def register(user: UserCreate):
@@ -26,10 +31,10 @@ async def register(user: UserCreate):
     return UserResponse(id=str(new_user["_id"]), **new_user)
 
 @router.post("/login", response_model=Token)
-async def login(email: str, password: str):
+async def login(login_data: LoginRequest):
     db = get_database()
-    user = await db["users"].find_one({"email": email})
-    if not user or not verify_password(password, user["hashed_password"]):
+    user = await db["users"].find_one({"email": login_data.email})
+    if not user or not verify_password(login_data.password, user["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
