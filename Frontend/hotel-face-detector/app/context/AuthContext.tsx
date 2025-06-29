@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from '@/app/types/auth';
+import { authApi } from '@/app/api/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -11,6 +12,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
 }
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -21,18 +24,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          // In a real app, verify token with backend
-          const userData = JSON.parse(localStorage.getItem('user') || 'null');
-          setUser(userData);
-        } catch (err) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          // Verify token with backend
+          const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (response.ok) {
+            const userData = await response.json();
+            setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
+          } else {
+            throw new Error('Token verification failed');
+          }
         }
+      } catch (err) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        console.error('Auth initialization error:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initAuth();
@@ -40,35 +56,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      // Simulated login - replace with actual API call
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+      setLoading(true);
+      const response = await authApi.login(email, password);
+      
+      localStorage.setItem('token', response.access_token);
+      
+      // Fetch user data after successful login
+      const userResponse = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${response.access_token}`
+        }
       });
       
-      if (!response.ok) throw new Error('Login failed');
+      if (!userResponse.ok) throw new Error('Failed to fetch user data');
       
-      const data = await response.json();
-      setUser(data.user);
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      const userData = await userResponse.json();
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
       
-      if (data.user.role === 'admin') {
+      // Redirect based on role
+      if (userData.role === 'admin') {
         router.push('/admin');
       } else {
         router.push('/dashboard');
       }
     } catch (err) {
-      throw new Error('Invalid credentials');
+      console.error('Login error:', err);
+      throw new Error(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = async () => {
-    setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    router.push('/login');
+    try {
+      // Call logout API if needed
+      await authApi.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      setUser(null);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      router.push('/login');
+    }
   };
 
   return (
