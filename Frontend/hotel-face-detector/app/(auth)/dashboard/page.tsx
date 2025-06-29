@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
-import { getAvailableRooms, getGuestReservations } from '@/app/lib/rooms';
+import { roomsApi } from '@/app/api/rooms';
 import { Room, Reservation } from '@/app/types';
 import RoomCard from '@/app/components/common/RoomCard';
 import ReservationCard from '@/app/components/common/ReservationCard';
@@ -24,8 +24,8 @@ export default function Dashboard() {
         setError(null);
         
         const [availableRooms, guestReservations] = await Promise.all([
-          getAvailableRooms(),
-          getGuestReservations(user.id),
+          roomsApi.getAvailableRooms(),
+          roomsApi.getRoomDetails(user.id),
         ]);
         
         // Ensure rooms data is properly formatted
@@ -37,10 +37,14 @@ export default function Dashboard() {
           capacity: room.capacity ?? 1,
           amenities: room.amenities ?? [],
           images: room.images ?? [],
-          available: room.available ?? true
+          available: room.available ?? true,
+          roomNumber: room.roomNumber ?? '',
+          roomType: room.roomType ?? 'Standard',
+          pricePerNight: room.pricePerNight ?? room.price ?? 0,
+          status: room.status ?? 'available'
         }));
         
-        setRooms(formattedRooms);
+        setRooms(formattedRooms as Room[]);
         
         // Ensure reservations data is properly formatted
         const formattedReservations = (guestReservations || []).map(reservation => ({
@@ -57,7 +61,7 @@ export default function Dashboard() {
           ) as 'pending' | 'confirmed' | 'checked-in' | 'checked-out' | 'cancelled',
         }));
         
-        setReservations(formattedReservations);
+        setReservations(formattedReservations as Reservation[]);
       } catch (err) {
         console.error('Failed to fetch data:', err);
         setError('Failed to load data. Please try again later.');

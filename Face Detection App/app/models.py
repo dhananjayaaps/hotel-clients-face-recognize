@@ -50,6 +50,7 @@ class User(BaseModel):
     full_name: str
     email: str
     hashed_password: str
+    role: str = "user"  # user or admin
 
     class Config:
         json_encoders = {ObjectId: str}

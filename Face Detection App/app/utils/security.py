@@ -5,6 +5,7 @@ from app.config import settings
 from app.schemas import TokenData
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import Depends, HTTPException, status
+import app.db as db_module
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -40,7 +41,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise credentials_exception
     
-    db = get_database()
+    db = db_module.get_database()
     user = await db["users"].find_one({"email": token_data.email})
     if user is None:
         raise credentials_exception

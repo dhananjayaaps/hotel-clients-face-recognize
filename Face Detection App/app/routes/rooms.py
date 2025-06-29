@@ -17,6 +17,10 @@ async def get_available_rooms():
 
 @router.post("/", response_model=RoomResponse)
 async def create_room(room: RoomCreate, current_user: dict = Depends(get_current_user)):
+    # Only admin can create rooms
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
     db = get_database()
     room_data = Room(**room.dict())
     result = await db["rooms"].insert_one(room_data.dict(by_alias=True, exclude={"id"}))

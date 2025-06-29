@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SignupForm from '@/app/components/auth/SignupForm';
-import { signup as apiSignup } from '@/app/lib/auth';
+import { authApi } from '@/app/api/auth';
 
 export default function SignupPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleSignup = async (data: {
@@ -17,16 +18,21 @@ export default function SignupPage() {
     phone: string;
     photos: File[];
   }) => {
+    setIsLoading(true);
+    setError('');
+    
     try {
-      await apiSignup(data);
+      await authApi.register(data);
       setSuccess(true);
       
       // Redirect to login after successful signup
       setTimeout(() => {
         router.push('/login');
       }, 3000);
-    } catch (err) {
-      setError('Signup failed. Please try again.');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Signup failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -46,7 +52,11 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-indigo-500 to-purple-600 p-4">
-      <SignupForm onSubmit={handleSignup} error={error} />
+      <SignupForm 
+        onSubmit={handleSignup} 
+        error={error} 
+        isLoading={isLoading}
+      />
     </div>
   );
 }

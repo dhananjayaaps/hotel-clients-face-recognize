@@ -1,12 +1,14 @@
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 
 class Token(BaseModel):
     access_token: str
     token_type: str
 
 class TokenData(BaseModel):
-    email: str | None = None
+    email: str
+    role: Optional[str] = "user"
 
 class UserCreate(BaseModel):
     full_name: str
@@ -17,6 +19,7 @@ class UserResponse(BaseModel):
     id: str
     full_name: str
     email: str
+    role: str
 
 class RoomCreate(BaseModel):
     room_number: str
@@ -24,7 +27,7 @@ class RoomCreate(BaseModel):
     price_per_night: float
     capacity: int = 2
     amenities: list[str] = []
-    image_url: str | None = None
+    image_url: Optional[str] = None
 
 class RoomResponse(RoomCreate):
     id: str
@@ -43,3 +46,11 @@ class ReservationResponse(BaseModel):
     check_out_date: datetime
     total_amount: float
     status: str
+
+class SystemStats(BaseModel):
+    total_guests: int
+    occupied_rooms: int
+    available_rooms: int
+    today_check_ins: int
+    today_check_outs: int
+    monthly_revenue: float

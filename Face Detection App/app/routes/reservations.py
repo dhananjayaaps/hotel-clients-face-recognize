@@ -9,7 +9,10 @@ from datetime import datetime
 router = APIRouter()
 
 @router.get("/guest/{guest_id}", response_model=list[ReservationResponse])
-async def get_guest_reservations(guest_id: str):
+async def get_guest_reservations(guest_id: str, current_user: dict = Depends(get_current_user)):
+    if str(current_user["_id"]) != guest_id and current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
     db = get_database()
     reservations = []
     async for res in db["reservations"].find({"guest_id": ObjectId(guest_id)}):
@@ -21,7 +24,7 @@ async def get_guest_reservations(guest_id: str):
                 room_type=room["room_type"],
                 price_per_night=room["price_per_night"],
                 status=room["status"],
-                capacity=room["capacity"],
+                capacity=room.get("capacity", 2),
                 amenities=room.get("amenities", []),
                 image_url=room.get("image_url")
             )
@@ -39,12 +42,23 @@ async def get_guest_reservations(guest_id: str):
 async def create_reservation(reservation: ReservationCreate, current_user: dict = Depends(get_current_user)):
     db = get_database()
     
-    # Check room availability
     room = await db["rooms"].find_one({"_id": ObjectId(reservation.room_id)})
     if not room or room["status"] != "available":
         raise HTTPException(status_code=400, detail="Room not available")
     
-    # Create reservation
+    # Check if the room is already reserved in the requested date range
+    overlapping = await db["reservations"].find_one({
+        "room_id": ObjectId(reservation.room_id),
+        "$or": [
+            {
+                "check_in_date": {"$lt": reservation.check_out_date},
+                "check_out_date": {"$gt": reservation.check_in_date}
+            }
+        ]
+    })
+    if overlapping:
+        raise HTTPException(status_code=400, detail="Room already reserved for the selected dates")
+
     reservation_data = Reservation(
         room_id=ObjectId(reservation.room_id),
         guest_id=ObjectId(current_user["_id"]),
@@ -53,17 +67,15 @@ async def create_reservation(reservation: ReservationCreate, current_user: dict 
         total_amount=reservation.total_amount,
         status="confirmed"
     )
-    
-    # Update room status
+
     await db["rooms"].update_one(
         {"_id": ObjectId(reservation.room_id)},
         {"$set": {"status": "booked"}}
     )
-    
+
     result = await db["reservations"].insert_one(reservation_data.dict(by_alias=True, exclude={"id"}))
     new_res = await db["reservations"].find_one({"_id": result.inserted_id})
-    
-    # Get room for response
+
     room = await db["rooms"].find_one({"_id": ObjectId(reservation.room_id)})
     room_resp = RoomResponse(
         id=str(room["_id"]),
@@ -71,11 +83,11 @@ async def create_reservation(reservation: ReservationCreate, current_user: dict 
         room_type=room["room_type"],
         price_per_night=room["price_per_night"],
         status=room["status"],
-        capacity=room["capacity"],
+        capacity=room.get("capacity", 2),
         amenities=room.get("amenities", []),
         image_url=room.get("image_url")
     )
-    
+
     return ReservationResponse(
         id=str(new_res["_id"]),
         room=room_resp,

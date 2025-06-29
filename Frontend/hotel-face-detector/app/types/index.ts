@@ -13,6 +13,14 @@ export interface LoginResponse {
 }
 
 export interface Room {
+  name: string;
+  description: string;
+  price: number;
+  capacity: number;
+  amenities: never[];
+  images: never[];
+  available: boolean;
+  map(arg0: (reservation: any) => { id: any; roomId: any; guestId: any; checkInDate: any; checkOutDate: any; totalAmount: any; status: "pending" | "confirmed" | "checked-in" | "checked-out" | "cancelled"; }): unknown;
   id: string;
   roomNumber: string;
   roomType: string;

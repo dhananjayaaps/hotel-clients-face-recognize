@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
-import { getSystemStats } from '@/app/lib/admin';
+import { adminApi } from '@/app/api/admin';
 import { SystemStats } from '@/app/types';
 import StatsCard from '@/app/components/admin/StatCard';
 import DataTable from '@/app/components/admin/DataTable';
@@ -18,7 +18,7 @@ export default function AdminDashboard() {
       if (!user || user.role !== 'admin') return;
       
       try {
-        const data = await getSystemStats();
+        const data = await adminApi.getSystemStats();
         setStats(data);
       } catch (err) {
         console.error('Failed to fetch stats:', err);
