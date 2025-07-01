@@ -29,9 +29,15 @@ class RoomCreate(BaseModel):
     amenities: list[str] = []
     image_url: Optional[str] = None
 
-class RoomResponse(RoomCreate):
+class RoomResponse(BaseModel):
     id: str
+    room_number: int
+    room_type: str
+    price_per_night: float
+    capacity: int
+    amenities: list[str]
     status: str
+    image_url: str
 
 class ReservationCreate(BaseModel):
     room_id: str

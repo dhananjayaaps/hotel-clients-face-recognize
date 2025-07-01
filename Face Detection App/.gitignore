@@ -155,3 +155,8 @@ local_settings.py
 app/config.py
 
 venv
+
+uploads
+uploads/*
+
+known_faces/*

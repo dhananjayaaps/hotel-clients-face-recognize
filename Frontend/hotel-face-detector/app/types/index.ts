@@ -13,19 +13,16 @@ export interface LoginResponse {
 }
 
 export interface Room {
-  name: string;
-  description: string;
-  price: number;
-  capacity: number;
-  amenities: never[];
-  images: never[];
-  available: boolean;
-  map(arg0: (reservation: any) => { id: any; roomId: any; guestId: any; checkInDate: any; checkOutDate: any; totalAmount: any; status: "pending" | "confirmed" | "checked-in" | "checked-out" | "cancelled"; }): unknown;
   id: string;
-  roomNumber: string;
-  roomType: string;
-  pricePerNight: number;
-  status: string;
+  room_number: number;
+  room_type: string;
+  price_per_night: number;
+  capacity: number;
+  amenities?: string[];
+  image_url?: string;
+  status: 'available' | 'booked' | 'maintenance';
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SignupResponse {

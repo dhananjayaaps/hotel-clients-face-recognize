@@ -14,10 +14,12 @@
     "dropzone": "^6.0.0-beta.2",
     "framer-motion": "^12.19.2",
     "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.525.0",
     "next": "15.3.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-dropzone": "^14.3.8"
+    "react-dropzone": "^14.3.8",
+    "react-hot-toast": "^2.5.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

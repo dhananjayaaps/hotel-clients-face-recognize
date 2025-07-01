@@ -9,7 +9,7 @@ from app.utils.face_utils import load_known_faces, process_frame, eye_aspect_rat
 router = APIRouter()
 known_encs, known_names = [], []
 
-@router.websocket("/ws")
+@router.websocket("")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     global known_encs, known_names
