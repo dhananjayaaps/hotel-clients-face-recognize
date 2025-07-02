@@ -12,17 +12,26 @@ export interface LoginResponse {
   user: User;
 }
 
+// types/index.ts
 export interface Room {
   id: string;
-  room_number: number;
+  room_number: string;
+  room_type: string;
+  price_per_night: number;
+  status: 'available' | 'occupied' | 'maintenance';
+  capacity: number;
+  amenities: string[];
+  image_url?: string;
+}
+
+export interface CreateRoomData {
+  room_number: string;
   room_type: string;
   price_per_night: number;
   capacity: number;
-  amenities?: string[];
+  amenities: string[];
+  status?: 'available' | 'occupied' | 'maintenance';
   image_url?: string;
-  status: 'available' | 'booked' | 'maintenance';
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface SignupResponse {

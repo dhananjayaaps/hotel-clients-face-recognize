@@ -1,114 +1,131 @@
+// api/admin.ts
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-interface SystemStats {
-  total_guests: number;
-  occupied_rooms: number;
-  available_rooms: number;
-  today_check_ins: number;
-  today_check_outs: number;
-  monthly_revenue: number;
-}
-
-interface Reservation {
+interface Room {
   id: string;
-  guest_name: string;
   room_number: string;
-  check_in_date: string;
-  check_out_date: string;
-  status: string;
-  total_amount: number;
+  room_type: string;
+  price_per_night: number;
+  status: 'available' | 'occupied' | 'maintenance';
+  capacity: number;
+  amenities: string[];
+  image_url?: string;
 }
 
-interface RevenueData {
-  date: string;
-  revenue: number;
-  reservations_count: number;
+interface CreateRoomData {
+  room_number: string;
+  room_type: string;
+  price_per_night: number;
+  capacity: number;
+  amenities: string[];
+  status?: 'available' | 'occupied' | 'maintenance';
+  image_url?: string;
 }
 
 interface AdminApi {
-  getSystemStats: (token: string) => Promise<SystemStats>;
-  getRecentReservations: (token: string, limit?: number) => Promise<Reservation[]>;
-  getRevenueAnalytics: (token: string, period: 'daily' | 'weekly' | 'monthly') => Promise<RevenueData[]>;
+  getRooms: (status?: string) => Promise<Room[]>;
+  getRoom: (roomId: string) => Promise<Room>;
+  createRoom: (roomData: CreateRoomData) => Promise<Room>;
+  updateRoom: (roomId: string, roomData: Partial<CreateRoomData>) => Promise<Room>;
+  deleteRoom: (roomId: string) => Promise<void>;
 }
 
-export const adminApi: AdminApi = {
-  getSystemStats: async (token: string): Promise<SystemStats> => {
+const getAuthToken = (): string => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
     if (!token) {
-      throw new Error('Authorization token is required');
+      throw new Error('No authentication token found');
     }
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/admin/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      return response.data as SystemStats;
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        console.error('API Error:', error.response?.data?.detail || error.message);
-        throw new Error(error.response?.data?.detail || 'Failed to fetch system stats');
-      }
-      console.error('Unexpected Error:', error);
-      throw new Error('An unexpected error occurred');
-    }
-  },
-
-  getRecentReservations: async (token: string, limit: number = 10): Promise<Reservation[]> => {
-    if (!token) {
-      throw new Error('Authorization token is required');
-    }
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/admin/reservations/recent`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        params: { limit }
-      });
-
-      return response.data.map((res: any) => ({
-        id: res.id,
-        guest_name: res.guest_name,
-        room_number: res.room_number,
-        check_in_date: res.check_in_date,
-        check_out_date: res.check_out_date,
-        status: res.status,
-        total_amount: res.total_amount
-      }));
-    } catch (error) {
-      console.error('Failed to fetch recent reservations:', error);
-      throw new Error('Failed to fetch recent reservations');
-    }
-  },
-
-  getRevenueAnalytics: async (token: string, period: 'daily' | 'weekly' | 'monthly' = 'weekly'): Promise<RevenueData[]> => {
-    if (!token) {
-      throw new Error('Authorization token is required');
-    }
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/admin/analytics/revenue`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        params: { period }
-      });
-
-      return response.data.map((item: any) => ({
-        date: item.date,
-        revenue: item.revenue,
-        reservations_count: item.reservations_count
-      }));
-    } catch (error) {
-      console.error('Failed to fetch revenue analytics:', error);
-      throw new Error('Failed to fetch revenue analytics');
-    }
+    return token;
   }
+  throw new Error('Cannot access localStorage on server side');
+};
+
+const handleApiError = (error: unknown, defaultMessage: string): never => {
+  if (axios.isAxiosError(error)) {
+    const errorMessage = error.response?.data?.detail || error.message;
+    console.error('API Error:', errorMessage);
+    throw new Error(errorMessage || defaultMessage);
+  }
+  console.error('Unexpected Error:', error);
+  throw new Error(defaultMessage);
+};
+
+export const adminApi: AdminApi = {
+  getRooms: async (status?: string): Promise<Room[]> => {
+    try {
+      const token = getAuthToken();
+      const response = await axios.get(`${API_BASE_URL}/api/rooms`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        params: status ? { status } : {},
+      });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch rooms');
+    }
+  },
+
+  getRoom: async (roomId: string): Promise<Room> => {
+    try {
+      const token = getAuthToken();
+      const response = await axios.get(`${API_BASE_URL}/api/rooms/${roomId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch room details');
+    }
+  },
+
+  createRoom: async (roomData: CreateRoomData): Promise<Room> => {
+    try {
+      const token = getAuthToken();
+      const response = await axios.post(`${API_BASE_URL}/api/rooms`, roomData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error, 'Failed to create room');
+    }
+  },
+
+  updateRoom: async (roomId: string, roomData: Partial<CreateRoomData>): Promise<Room> => {
+    try {
+      const token = getAuthToken();
+      const response = await axios.patch(`${API_BASE_URL}/api/rooms/${roomId}`, roomData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error, 'Failed to update room');
+    }
+  },
+
+  deleteRoom: async (roomId: string): Promise<void> => {
+    try {
+      const token = getAuthToken();
+      await axios.delete(`${API_BASE_URL}/api/rooms/${roomId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (error) {
+      return handleApiError(error, 'Failed to delete room');
+    }
+  },
 };
