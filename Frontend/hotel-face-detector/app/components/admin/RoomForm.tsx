@@ -21,6 +21,8 @@ export default function RoomForm({ room }: RoomFormProps) {
     image_url: room?.image_url || '',
   });
   const [error, setError] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(room?.image_url || null);
 
   const availableAmenities = [
     'Wi-Fi', 'TV', 'Air Conditioning', 'Mini Bar', 'Balcony', 'Bathtub', 'Coffee Maker', 'Safe'
@@ -31,10 +33,18 @@ export default function RoomForm({ room }: RoomFormProps) {
     setError(null);
 
     try {
+      let updatedFormData = { ...formData };
+
+      // Upload image if a new file is selected
+      if (imageFile) {
+        const imageUrl = await adminApi.uploadImage(imageFile);
+        updatedFormData = { ...updatedFormData, image_url: imageUrl };
+      }
+
       if (room) {
-        await adminApi.updateRoom(room.id, formData);
+        await adminApi.updateRoom(room.id, updatedFormData);
       } else {
-        await adminApi.createRoom(formData);
+        await adminApi.createRoom(updatedFormData);
       }
       router.push('/admin');
     } catch (err: any) {
@@ -59,6 +69,22 @@ export default function RoomForm({ room }: RoomFormProps) {
         : [...prev.amenities, amenity];
       return { ...prev, amenities };
     });
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setError('Only image files are allowed');
+        return;
+      }
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -164,15 +190,23 @@ export default function RoomForm({ room }: RoomFormProps) {
           </div>
           <div className="mb-4">
             <label className="block text-sm font-medium mb-1 text-gray-300">
-              Image URL (optional)
+              Room Image
             </label>
             <input
-              type="text"
-              name="image_url"
-              value={formData.image_url || ''}
-              onChange={handleInputChange}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-100 focus:outline-none"
             />
+            {imagePreview && (
+              <div className="mt-2">
+                <img
+                  src={imagePreview}
+                  alt="Room preview"
+                  className="w-full h-48 object-cover rounded border border-gray-600"
+                />
+              </div>
+            )}
           </div>
           <div className="flex justify-end space-x-2">
             <button

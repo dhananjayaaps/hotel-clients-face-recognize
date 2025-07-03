@@ -70,63 +70,78 @@ export default function AdminDashboard() {
         </h1>
 
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-semibold text-gray-200">Rooms</h2>
+          <h2 className="text-2xl font-semibold text-gray-100">Rooms</h2>
           <Link
             href="/admin/rooms/create"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors shadow-md"
           >
             Create New Room
           </Link>
         </div>
 
-        <div className="bg-gray-800 rounded-lg shadow-lg p-6 border border-gray-700">
-          <h2 className="text-xl font-semibold mb-4 text-gray-200">Room List</h2>
-          <DataTable
-            headers={['Room Number', 'Type', 'Status', 'Price', 'Capacity', 'Amenities', 'Actions']}
-            data={rooms.map((room) => [
-                <span key={`room-number-${room.id}`} className="text-gray-200">
-                  {room.room_number}
-                </span>,
-                <span key={`room-type-${room.id}`} className="text-gray-200">
-                  {room.room_type}
-                </span>,
-                <span
-                  key={`status-${room.id}`}
-                  className={`px-2 py-1 rounded-full text-xs ${
-                    room.status === 'available'
-                      ? 'bg-green-900 text-green-300'
-                      : room.status === 'occupied'
-                      ? 'bg-red-900 text-red-300'
-                      : 'bg-yellow-900 text-yellow-300'
-                  }`}
-                >
-                  {room.status}
-                </span>,
-                <span key={`price-${room.id}`} className="text-gray-200">
-                  ${room.price_per_night.toFixed(2)}
-                </span>,
-                <span key={`capacity-${room.id}`} className="text-gray-200">
-                  {room.capacity}
-                </span>,
-                <span key={`amenities-${room.id}`} className="text-gray-200">
-                  {room.amenities.join(', ')}
-                </span>,
-                <div key={`actions-${room.id}`} className="flex space-x-2">
-                  <button
-                    onClick={() => handleEditRoom(room.id)}
-                    className="text-blue-400 hover:text-blue-300 transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteRoom(room.id)}
-                    className="text-red-400 hover:text-red-300 transition-colors"
-                  >
-                    Delete
-                  </button>
-                </div>,
-            ])}
-          />
+        <div className="bg-gray-800 rounded-xl shadow-xl p-6 border border-gray-700">
+          <h2 className="text-xl font-semibold mb-4 text-gray-100">Room List</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full bg-gray-850 border-collapse">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Room Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Capacity</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Amenities</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {rooms.map((room) => (
+                  <tr key={room.id} className="hover:bg-gray-800/50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-200 font-medium">
+                      {room.room_number}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-300">
+                      {room.room_type}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        room.status === 'available'
+                          ? 'bg-green-900/40 text-green-300'
+                          : room.status === 'occupied'
+                          ? 'bg-red-900/40 text-red-300'
+                          : 'bg-yellow-900/40 text-yellow-300'
+                      }`}>
+                        {room.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-300 font-mono">
+                      ${room.price_per_night.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-300">
+                      {room.capacity}
+                    </td>
+                    <td className="px-6 py-4 text-gray-300 max-w-xs truncate">
+                      {room.amenities.join(', ')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap space-x-3">
+                      <button
+                        onClick={() => handleEditRoom(room.id)}
+                        className="text-blue-400 hover:text-blue-300 transition-colors px-2 py-1 rounded hover:bg-blue-900/30"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRoom(room.id)}
+                        className="text-red-400 hover:text-red-300 transition-colors px-2 py-1 rounded hover:bg-red-900/30"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

@@ -28,6 +28,7 @@ class RoomCreate(BaseModel):
     capacity: int = 2
     amenities: list[str] = []
     image_url: Optional[str] = None
+    status: str = "available"
 
 class RoomResponse(BaseModel):
     id: str

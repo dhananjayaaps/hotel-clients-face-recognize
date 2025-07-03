@@ -1,4 +1,3 @@
-// api/admin.ts
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -30,6 +29,7 @@ interface AdminApi {
   createRoom: (roomData: CreateRoomData) => Promise<Room>;
   updateRoom: (roomId: string, roomData: Partial<CreateRoomData>) => Promise<Room>;
   deleteRoom: (roomId: string) => Promise<void>;
+  uploadImage: (file: File) => Promise<string>;
 }
 
 const getAuthToken = (): string => {
@@ -126,6 +126,23 @@ export const adminApi: AdminApi = {
       });
     } catch (error) {
       return handleApiError(error, 'Failed to delete room');
+    }
+  },
+
+  uploadImage: async (file: File): Promise<string> => {
+    try {
+      const token = getAuthToken();
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await axios.post(`${API_BASE_URL}/api/images/upload`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data.image_url;
+    } catch (error) {
+      return handleApiError(error, 'Failed to upload image');
     }
   },
 };
