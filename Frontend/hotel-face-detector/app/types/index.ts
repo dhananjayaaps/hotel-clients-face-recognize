@@ -22,6 +22,7 @@ export interface Room {
   capacity: number;
   amenities: string[];
   image_url?: string;
+  description?: string;
 }
 
 export interface CreateRoomData {
@@ -32,6 +33,7 @@ export interface CreateRoomData {
   amenities: string[];
   status?: 'available' | 'occupied' | 'maintenance';
   image_url?: string;
+  description?: string;
 }
 
 export interface SignupResponse {
