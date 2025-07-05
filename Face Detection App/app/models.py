@@ -38,8 +38,7 @@ class Reservation(BaseModel):
     guest_id: PyObjectId
     check_in_date: datetime
     check_out_date: datetime
-    total_amount: float
-    status: str = "pending"  # pending, confirmed, checked-in, checked-out, cancelled
+    status: str = "confirmed"  # confirmed, checked-in, checked-out, cancelled
 
     class Config:
         json_encoders = {ObjectId: str}

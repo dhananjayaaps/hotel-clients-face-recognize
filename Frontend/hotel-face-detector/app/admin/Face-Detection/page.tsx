@@ -1,4 +1,3 @@
-// app/check-in/page.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -20,13 +19,17 @@ export default function CheckInPage() {
   const [cameraActive, setCameraActive] = useState(false);
   const [checkInStatus, setCheckInStatus] = useState<'pending' | 'success' | 'failed'>('pending');
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const displayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const captureCanvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  
   const frameCountRef = useRef(0);
   const lastFpsUpdateRef = useRef(0);
   const streamRef = useRef<MediaStream | null>(null);
   const checkInTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const cameraIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     return () => {
@@ -40,7 +43,9 @@ export default function CheckInPage() {
   const connectWebSocket = async () => {
     setIsLoading(true);
     setError(null);
-    
+    setCheckInStatus('pending');
+    setCurrentUser(null);
+
     try {
       const cameraStarted = await startCamera();
       if (!cameraStarted) {
@@ -49,8 +54,8 @@ export default function CheckInPage() {
       }
 
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      wsRef.current = new WebSocket(`${protocol}//localhost:8000/ws/face`);
+      const wsUrl = `${protocol}//${window.location.hostname}:8000/ws/face`;
+      wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
         console.log('WebSocket Connected');
@@ -63,7 +68,7 @@ export default function CheckInPage() {
           const data: FaceResult[] = JSON.parse(event.data);
           setResults(data);
           frameCountRef.current += 1;
-          
+
           const now = performance.now();
           if (now - lastFpsUpdateRef.current > 1000) {
             setFps(Math.round(frameCountRef.current * 1000 / (now - lastFpsUpdateRef.current)));
@@ -71,7 +76,6 @@ export default function CheckInPage() {
             lastFpsUpdateRef.current = now;
           }
 
-          // Handle check-in logic
           handleCheckIn(data);
         } catch (err) {
           console.error('Error parsing message:', err);
@@ -99,14 +103,12 @@ export default function CheckInPage() {
   };
 
   const handleCheckIn = (faces: FaceResult[]) => {
-    // Find the first live recognized face (not "Unknown")
     const validFace = faces.find(face => face.status === 'Live' && face.name !== 'Unknown');
 
     if (validFace) {
       setCurrentUser(validFace.name);
       setCheckInStatus('success');
-      
-      // Reset after 5 seconds
+
       if (checkInTimeoutRef.current) {
         clearTimeout(checkInTimeoutRef.current);
       }
@@ -123,12 +125,12 @@ export default function CheckInPage() {
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
           width: { ideal: 1280 },
           height: { ideal: 720 },
-          facingMode: 'user' 
-        } 
+          facingMode: 'user',
+        },
       });
 
       if (videoRef.current) {
@@ -138,7 +140,16 @@ export default function CheckInPage() {
       }
 
       streamRef.current = stream;
-      processVideo();
+
+      if (cameraIntervalRef.current) {
+        clearInterval(cameraIntervalRef.current);
+      }
+      
+      // Start frame processing
+      cameraIntervalRef.current = setInterval(() => {
+        sendFrame();
+      }, 200);
+
       return true;
     } catch (err) {
       console.error('Camera Error:', err);
@@ -147,35 +158,44 @@ export default function CheckInPage() {
     }
   };
 
-  const processVideo = () => {
-    const processFrame = () => {
-      if (!videoRef.current || !canvasRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        return;
-      }
+  const sendFrame = () => {
+    if (!videoRef.current || 
+        !captureCanvasRef.current || 
+        !displayCanvasRef.current || 
+        !wsRef.current || 
+        wsRef.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
 
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
+    const video = videoRef.current;
+    const captureCanvas = captureCanvasRef.current;
+    const displayCanvas = displayCanvasRef.current;
+    
+    // Set canvas dimensions
+    captureCanvas.width = video.videoWidth;
+    captureCanvas.height = video.videoHeight;
+    displayCanvas.width = video.videoWidth;
+    displayCanvas.height = video.videoHeight;
 
-      if (!ctx || !video.videoWidth || !video.videoHeight) return;
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      canvas.toBlob((blob) => {
+    // Draw video frame to capture canvas
+    const captureCtx = captureCanvas.getContext('2d');
+    if (captureCtx) {
+      captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+      
+      // Send frame to backend
+      captureCanvas.toBlob((blob) => {
         if (blob && wsRef.current?.readyState === WebSocket.OPEN) {
           wsRef.current.send(blob);
         }
       }, 'image/jpeg', 0.8);
+    }
 
-      drawResults(ctx, canvas.width, canvas.height);
-
-      requestAnimationFrame(processFrame);
-    };
-
-    processFrame();
+    // Draw results on display canvas
+    const displayCtx = displayCanvas.getContext('2d');
+    if (displayCtx) {
+      displayCtx.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
+      drawResults(displayCtx, displayCanvas.width, displayCanvas.height);
+    }
   };
 
   const drawResults = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
@@ -204,16 +224,32 @@ export default function CheckInPage() {
       wsRef.current.close();
       wsRef.current = null;
     }
+    
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    
+    if (cameraIntervalRef.current) {
+      clearInterval(cameraIntervalRef.current);
+      cameraIntervalRef.current = null;
+    }
+    
+    if (checkInTimeoutRef.current) {
+      clearTimeout(checkInTimeoutRef.current);
+      checkInTimeoutRef.current = null;
+    }
+    
     setResults([]);
     setFps(0);
     setIsConnected(false);
     setCameraActive(false);
     setCheckInStatus('pending');
     setCurrentUser(null);
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
   };
 
   const toggleConnection = () => {
@@ -238,8 +274,8 @@ export default function CheckInPage() {
           {/* Video Feed Section */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-md overflow-hidden">
             <div className="relative bg-black">
-              <video 
-                ref={videoRef} 
+              <video
+                ref={videoRef}
                 className={`w-full aspect-video ${cameraActive ? '' : 'hidden'}`}
                 muted
                 playsInline
@@ -253,10 +289,11 @@ export default function CheckInPage() {
                   )}
                 </div>
               )}
-              <canvas 
-                ref={canvasRef} 
+              <canvas
+                ref={displayCanvasRef}
                 className="absolute top-0 left-0 w-full h-full pointer-events-none"
               />
+              <canvas ref={captureCanvasRef} className="hidden" />
             </div>
 
             <div className="p-4 border-t border-gray-200">
@@ -312,7 +349,7 @@ export default function CheckInPage() {
             <div className="p-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">Check-In Status</h2>
             </div>
-            
+
             {error && (
               <div className="p-4 bg-red-50 text-red-700 border-b border-red-100">
                 {error}
@@ -365,9 +402,7 @@ export default function CheckInPage() {
                 ) : (
                   results.slice(0, 3).map((result, index) => (
                     <div key={index} className="flex items-center gap-3">
-                      <div className={`h-2 w-2 rounded-full ${
-                        result.status === 'Live' ? 'bg-green-500' : 'bg-red-500'
-                      }`} />
+                      <div className={`h-2 w-2 rounded-full ${result.status === 'Live' ? 'bg-green-500' : 'bg-red-500'}`} />
                       <span className="text-sm font-medium">{result.name}</span>
                       <span className="text-xs text-gray-500 ml-auto">
                         {new Date().toLocaleTimeString()}
