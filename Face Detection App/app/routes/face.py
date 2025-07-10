@@ -5,6 +5,7 @@ from collections import defaultdict
 from fastapi import WebSocket, APIRouter
 from app.config import settings
 from app.utils.face_utils import load_known_faces, process_frame, eye_aspect_ratio
+from app.db import get_database
 
 router = APIRouter()
 known_encs, known_names = [], []
@@ -14,11 +15,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     global known_encs, known_names
     
-    if not known_encs:
-        known_encs, known_names = load_known_faces(
-            settings.known_faces_dir,
-            settings.detection_method
-        )
+    known_encs, known_names = load_known_faces()
     
     close_counts = defaultdict(int)
     last_blink_time = {}

@@ -160,3 +160,4 @@ uploads
 uploads/*
 
 known_faces/*
+face_encodings/*

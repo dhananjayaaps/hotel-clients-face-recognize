@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List
 
+import cv2
 from fastapi import (
     APIRouter,
     Depends,
@@ -26,6 +27,8 @@ from app.utils.security import (
     get_password_hash,
     verify_password,
 )
+from app.utils.face_utils import encode_face
+from app.config import settings
 
 router = APIRouter()
 
@@ -47,6 +50,14 @@ class LoginRequest(BaseModel):
     password: str
 
 
+import os
+import pickle
+from pathlib import Path
+
+# Add this to your configuration
+FACE_ENCODINGS_DIR = "face_encodings"
+Path(FACE_ENCODINGS_DIR).mkdir(exist_ok=True)
+
 @router.post("/register", response_model=UserResponse)
 async def register(
     full_name: str = Form(...),
@@ -61,9 +72,15 @@ async def register(
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    if not photos:
+        raise HTTPException(status_code=400, detail="At least one photo is required for face registration")
+
     photo_urls = []
+    encoding_files = []  # To store paths to encoding files
+    
     for photo in photos:
         try:
+            # Save the photo
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             ext = photo.filename.split(".")[-1]
             filename = f"{timestamp}_{uuid.uuid4().hex[:8]}.{ext}"
@@ -73,8 +90,39 @@ async def register(
                 buffer.write(await photo.read())
 
             photo_urls.append(f"/{UPLOAD_DIR}/{filename}")
+
+            # Generate and save face encoding
+            image = cv2.imread(filepath)
+            if image is not None:
+                encoding = encode_face(image, settings.detection_method)
+                if encoding is not None:
+                    # Create unique filename for the encoding
+                    encoding_filename = f"{email}_{uuid.uuid4().hex[:8]}.pkl"
+                    encoding_path = os.path.join(FACE_ENCODINGS_DIR, encoding_filename)
+                    
+                    # Save the encoding to a file
+                    with open(encoding_path, 'wb') as f:
+                        pickle.dump({
+                            'encoding': encoding,
+                            'name': full_name,
+                            'email': email,
+                            'photo_url': f"/{UPLOAD_DIR}/{filename}"
+                        }, f)
+                    
+                    encoding_files.append(encoding_filename)
+                else:
+                    print(f"No face detected in photo: {photo.filename}")
+            else:
+                print(f"Failed to read image: {filepath}")
+
         except Exception as e:
-            print(f"Failed to upload photo: {e}")
+            print(f"Failed to process photo: {e}")
+
+    if not encoding_files:
+        raise HTTPException(
+            status_code=400, 
+            detail="No faces detected in the provided photos. Please upload clear photos with visible faces."
+        )
 
     hashed_password = get_password_hash(password)
 
@@ -84,6 +132,7 @@ async def register(
         hashed_password=hashed_password,
         phone=phone,
         photo_urls=photo_urls,
+        encoding_files=encoding_files,  # Store paths to encoding files
         role="user",
     )
 

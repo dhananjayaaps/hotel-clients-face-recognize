@@ -3,28 +3,27 @@ import cv2
 import face_recognition
 import numpy as np
 from app.config import settings
+import os
+import pickle
+from pathlib import Path
 
-def load_known_faces(known_faces_dir: str, detection_method: str):
-    known_encodings, known_names = [], []
-    for person in os.listdir(known_faces_dir):
-        pdir = os.path.join(known_faces_dir, person)
-        if not os.path.isdir(pdir): 
-            continue
-            
-        for fn in os.listdir(pdir):
-            path = os.path.join(pdir, fn)
+def load_known_faces():
+    """Load known faces from encodings directory"""
+    known_encs = []
+    known_names = []
+    
+    for filename in os.listdir(settings.FACE_ENCODINGS_DIR):
+        if filename.endswith('.pkl'):
             try:
-                img = face_recognition.load_image_file(path)
-                locs = face_recognition.face_locations(img, model=detection_method)
-                if not locs:
-                    continue
-                enc = face_recognition.face_encodings(img, known_face_locations=locs)[0]
-                known_encodings.append(enc)
-                known_names.append(person)
+                with open(os.path.join(settings.FACE_ENCODINGS_DIR, filename), 'rb') as f:
+                    data = pickle.load(f)
+                    known_encs.append(data['encoding'])
+                    known_names.append(data['name'])
             except Exception as e:
-                print(f"Error processing {path}: {e}")
+                print(f"Error loading encoding file {filename}: {e}")
                 continue
-    return known_encodings, known_names
+                
+    return known_encs, known_names
 
 def process_frame(
     frame, 
@@ -78,3 +77,22 @@ def eye_aspect_ratio(eye):
     B = np.linalg.norm(np.array(eye[2]) - np.array(eye[4]))
     C = np.linalg.norm(np.array(eye[0]) - np.array(eye[3]))
     return (A + B) / (2.0 * C)
+
+def encode_face(image, detection_method="hog"):
+    # Convert image from BGR to RGB (OpenCV uses BGR by default)
+    rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Detect face locations
+    boxes = face_recognition.face_locations(rgb, model=detection_method)
+    
+    # If no faces found, return None
+    if not boxes:
+        return None
+        
+    # Get face encodings for the first face found
+    encodings = face_recognition.face_encodings(rgb, boxes)
+    
+    if not encodings:
+        return None
+        
+    return encodings[0]  # Return the first face encoding
