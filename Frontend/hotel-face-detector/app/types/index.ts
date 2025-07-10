@@ -47,13 +47,11 @@ export type RoomStatus = 'available' | 'occupied' | 'maintenance';
 // reservations.ts
 export interface Reservation {
   id: string;
-  guestId: string;
-  roomId: string;
-  checkInDate: string;
-  checkOutDate: string;
-  status: 'pending' | 'confirmed' | 'checked-in' | 'checked-out' | 'cancelled';
-  totalAmount: number;
-  specialRequests?: string;
+  room_id: string;
+  check_in_date: string;
+  check_out_date: string;
+  user_id: string;
+  created_at?: string;
 }
 
 // admin.ts
@@ -73,16 +71,4 @@ export interface User {
   fullName: string;
   role: 'guest' | 'admin' | 'staff';
   phone?: string;
-}
-
-// reservations.ts
-export interface Reservation {
-  id: string;
-  guestId: string;
-  roomId: string;
-  checkInDate: string;
-  checkOutDate: string;
-  status: 'pending' | 'confirmed' | 'checked-in' | 'checked-out' | 'cancelled';
-  totalAmount: number;
-  specialRequests?: string;
 }

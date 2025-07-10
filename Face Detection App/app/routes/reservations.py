@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 from app.db import get_database
 from app.utils.security import get_current_user
 from bson import ObjectId
@@ -31,22 +31,30 @@ async def create_reservation(
     if not ObjectId.is_valid(reservation.room_id):
         raise HTTPException(status_code=400, detail="Invalid room ID")
     
-    # Check if room exists and is available
+    # Check if room exists
     room = await db["rooms"].find_one({"_id": ObjectId(reservation.room_id)})
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     
+    # Make both datetimes offset-aware or offset-naive consistently
+    now = datetime.now(timezone.utc)  # Offset-aware
+    check_in = reservation.check_in_date.replace(tzinfo=timezone.utc) if reservation.check_in_date.tzinfo is None else reservation.check_in_date
+    check_out = reservation.check_out_date.replace(tzinfo=timezone.utc) if reservation.check_out_date.tzinfo is None else reservation.check_out_date
+    
     # Validate dates
-    if reservation.check_in_date >= reservation.check_out_date:
+    if check_in >= check_out:
         raise HTTPException(status_code=400, detail="Check-out must be after check-in")
     
-    # Check for conflicting reservations
+    if check_in < now:
+        raise HTTPException(status_code=400, detail="Check-in date cannot be in the past")
+    
+    # Check for conflicting reservations (using the timezone-aware dates)
     existing_reservation = await db["reservations"].find_one({
         "room_id": reservation.room_id,
         "$or": [
             {
-                "check_in_date": {"$lt": reservation.check_out_date},
-                "check_out_date": {"$gt": reservation.check_in_date}
+                "check_in_date": {"$lt": check_out},
+                "check_out_date": {"$gt": check_in}
             }
         ]
     })
@@ -57,13 +65,13 @@ async def create_reservation(
             detail="Room already booked for these dates"
         )
     
-    # Create reservation
+    # Create reservation (store with timezone info)
     reservation_data = {
         "room_id": reservation.room_id,
-        "check_in_date": reservation.check_in_date,
-        "check_out_date": reservation.check_out_date,
-        "user_id": current_user["id"],
-        "created_at": datetime.utcnow()
+        "check_in_date": check_in,
+        "check_out_date": check_out,
+        "user_id": str(current_user["_id"]),
+        "created_at": now
     }
     
     result = await db["reservations"].insert_one(reservation_data)
@@ -81,7 +89,7 @@ async def create_reservation(
 async def get_user_reservations(current_user: dict = Depends(get_current_user)):
     db = get_database()
     reservations = []
-    async for res in db["reservations"].find({"user_id": current_user["id"]}):
+    async for res in db["reservations"].find({"user_id": str(current_user["_id"])}):  # Match the stored string format
         reservations.append(ReservationResponse(
             id=str(res["_id"]),
             room_id=res["room_id"],

@@ -48,8 +48,8 @@ export default function RoomDetailsPage({ params }: { params: { id: string } }) 
     try {
       await roomsApi.createReservation({
         room_id: params.id,
-        check_in_date: reservationData.check_in_date,
-        check_out_date: reservationData.check_out_date,
+        check_in_date: new Date(reservationData.check_in_date).toISOString(), // Format as ISO string
+        check_out_date: new Date(reservationData.check_out_date).toISOString(), // Format as ISO string
         user_id: user.id,
       });
       alert('Reservation created successfully!');
