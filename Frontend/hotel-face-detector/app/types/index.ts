@@ -52,6 +52,7 @@ export interface Reservation {
   check_out_date: string;
   user_id: string;
   created_at?: string;
+  status?: string;
 }
 
 // admin.ts

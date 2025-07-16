@@ -1,13 +1,23 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, Video, VideoOff, Wifi, WifiOff, CheckCircle2, XCircle, User } from 'lucide-react';
+import { Loader2, Video, VideoOff, Wifi, WifiOff, CheckCircle2, XCircle, User, ChevronDown, ChevronUp } from 'lucide-react';
 import Button from '@/app/components/ui/Button';
+
+interface Reservation {
+  id: string;
+  room_id: string;
+  check_in_date: string;
+  check_out_date: string;
+  status: string;
+}
 
 interface FaceResult {
   name: string;
+  email: string;
   status: 'Live' | 'Not Live';
   bbox: [number, number, number, number];
+  reservations: Reservation[];
 }
 
 export default function CheckInPage() {
@@ -17,33 +27,30 @@ export default function CheckInPage() {
   const [error, setError] = useState<string | null>(null);
   const [fps, setFps] = useState(0);
   const [cameraActive, setCameraActive] = useState(false);
-  const [checkInStatus, setCheckInStatus] = useState<'pending' | 'success' | 'failed'>('pending');
-  const [currentUser, setCurrentUser] = useState<string | null>(null);
-  
+  const [currentUser, setCurrentUser] = useState<FaceResult | null>(null);
+  const [showReservations, setShowReservations] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [actionMessage, setActionMessage] = useState('');
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  
+
   const frameCountRef = useRef(0);
   const lastFpsUpdateRef = useRef(0);
   const streamRef = useRef<MediaStream | null>(null);
-  const checkInTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const cameraIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     return () => {
       disconnect();
-      if (checkInTimeoutRef.current) {
-        clearTimeout(checkInTimeoutRef.current);
-      }
     };
   }, []);
 
   const connectWebSocket = async () => {
     setIsLoading(true);
     setError(null);
-    setCheckInStatus('pending');
     setCurrentUser(null);
 
     try {
@@ -76,7 +83,7 @@ export default function CheckInPage() {
             lastFpsUpdateRef.current = now;
           }
 
-          handleCheckIn(data);
+          handleDetection(data);
         } catch (err) {
           console.error('Error parsing message:', err);
         }
@@ -102,24 +109,21 @@ export default function CheckInPage() {
     }
   };
 
-  const handleCheckIn = (faces: FaceResult[]) => {
-    const validFace = faces.find(face => face.status === 'Live' && face.name !== 'Unknown');
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-    if (validFace) {
-      setCurrentUser(validFace.name);
-      setCheckInStatus('success');
+  const handleDetection = (faces: FaceResult[]) => {
+    const validFace = faces.find(face =>
+      face.status === 'Live' &&
+      face.name !== 'Unknown' &&
+      face.reservations &&
+      face.reservations.length > 0
+    );
 
-      if (checkInTimeoutRef.current) {
-        clearTimeout(checkInTimeoutRef.current);
-      }
-      checkInTimeoutRef.current = setTimeout(() => {
-        setCheckInStatus('pending');
-        setCurrentUser(null);
-      }, 5000);
-    } else if (faces.length > 0 && faces.some(face => face.name !== 'Unknown')) {
-      setCheckInStatus('failed');
-    } else {
-      setCheckInStatus('pending');
+    if (validFace && !currentUser) {
+      // Found a user with reservations
+      setCurrentUser(validFace);
+      disconnect(); // Stop camera and websocket
+      setShowReservations(true);
     }
   };
 
@@ -144,8 +148,7 @@ export default function CheckInPage() {
       if (cameraIntervalRef.current) {
         clearInterval(cameraIntervalRef.current);
       }
-      
-      // Start frame processing
+
       cameraIntervalRef.current = setInterval(() => {
         sendFrame();
       }, 200);
@@ -159,30 +162,27 @@ export default function CheckInPage() {
   };
 
   const sendFrame = () => {
-    if (!videoRef.current || 
-        !captureCanvasRef.current || 
-        !displayCanvasRef.current || 
-        !wsRef.current || 
-        wsRef.current.readyState !== WebSocket.OPEN) {
+    if (!videoRef.current ||
+      !captureCanvasRef.current ||
+      !displayCanvasRef.current ||
+      !wsRef.current ||
+      wsRef.current.readyState !== WebSocket.OPEN) {
       return;
     }
 
     const video = videoRef.current;
     const captureCanvas = captureCanvasRef.current;
     const displayCanvas = displayCanvasRef.current;
-    
-    // Set canvas dimensions
+
     captureCanvas.width = video.videoWidth;
     captureCanvas.height = video.videoHeight;
     displayCanvas.width = video.videoWidth;
     displayCanvas.height = video.videoHeight;
 
-    // Draw video frame to capture canvas
     const captureCtx = captureCanvas.getContext('2d');
     if (captureCtx) {
       captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
-      
-      // Send frame to backend
+
       captureCanvas.toBlob((blob) => {
         if (blob && wsRef.current?.readyState === WebSocket.OPEN) {
           wsRef.current.send(blob);
@@ -190,7 +190,6 @@ export default function CheckInPage() {
       }, 'image/jpeg', 0.8);
     }
 
-    // Draw results on display canvas
     const displayCtx = displayCanvas.getContext('2d');
     if (displayCtx) {
       displayCtx.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
@@ -224,29 +223,22 @@ export default function CheckInPage() {
       wsRef.current.close();
       wsRef.current = null;
     }
-    
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    
+
     if (cameraIntervalRef.current) {
       clearInterval(cameraIntervalRef.current);
       cameraIntervalRef.current = null;
     }
-    
-    if (checkInTimeoutRef.current) {
-      clearTimeout(checkInTimeoutRef.current);
-      checkInTimeoutRef.current = null;
-    }
-    
+
     setResults([]);
     setFps(0);
     setIsConnected(false);
     setCameraActive(false);
-    setCheckInStatus('pending');
-    setCurrentUser(null);
-    
+
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
@@ -258,6 +250,108 @@ export default function CheckInPage() {
     } else {
       connectWebSocket();
     }
+  };
+
+  const getAuthToken = (): string => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      return token;
+    }
+    throw new Error('Cannot access localStorage on server side');
+  };
+
+  const handleCheckIn = async (reservationId: string) => {
+    if (!currentUser) return;
+
+    setProcessing(true);
+    setActionMessage('Processing check-in...');
+
+    try {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/api/reservations/checkin`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reservation_id: reservationId,
+          email: currentUser.email
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to check in');
+      }
+
+      setActionMessage('Check-in successful!');
+      setTimeout(() => {
+        setShowReservations(false);
+        setCurrentUser(null);
+        setProcessing(false);
+        connectWebSocket(); // Restart the camera
+      }, 2000);
+    } catch (err) {
+      console.error('Check-in error:', err);
+      setActionMessage(err instanceof Error ? err.message : 'Check-in failed. Please try again.');
+      setProcessing(false);
+    }
+  };
+
+  const handleCheckOut = async (reservationId: string) => {
+    if (!currentUser) return;
+
+    setProcessing(true);
+    setActionMessage('Processing check-out...');
+
+    try {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/api/reservations/checkout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          reservation_id: reservationId,
+          email: currentUser.email
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to check out');
+      }
+
+      setActionMessage('Check-out successful!');
+      setTimeout(() => {
+        setShowReservations(false);
+        setCurrentUser(null);
+        setProcessing(false);
+        connectWebSocket(); // Restart the camera
+      }, 2000);
+    } catch (err) {
+      console.error('Check-out error:', err);
+      setActionMessage(err instanceof Error ? err.message : 'Check-out failed. Please try again.');
+      setProcessing(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
@@ -344,10 +438,10 @@ export default function CheckInPage() {
             </div>
           </div>
 
-          {/* Check-In Status Section */}
+          {/* Status Section */}
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
             <div className="p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Check-In Status</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Status</h2>
             </div>
 
             {error && (
@@ -357,37 +451,30 @@ export default function CheckInPage() {
             )}
 
             <div className="p-6 flex flex-col items-center justify-center h-64">
-              {checkInStatus === 'pending' ? (
+              {currentUser ? (
                 <div className="text-center">
                   <div className="mx-auto h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center mb-4">
                     <User className="h-6 w-6 text-blue-600" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900">Ready for Check-In</h3>
+                  <h3 className="text-lg font-medium text-gray-900">Welcome, {currentUser.name}!</h3>
                   <p className="mt-1 text-sm text-gray-500">
-                    Please look at the camera to check in
-                  </p>
-                </div>
-              ) : checkInStatus === 'success' ? (
-                <div className="text-center">
-                  <div className="mx-auto h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mb-4">
-                    <CheckCircle2 className="h-6 w-6 text-green-600" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900">Check-In Successful</h3>
-                  <p className="mt-1 text-sm text-gray-900 font-medium">
-                    Welcome, {currentUser}!
-                  </p>
-                  <p className="mt-1 text-sm text-gray-500">
-                    You have been successfully checked in
+                    {currentUser.reservations.length} reservation(s) found
                   </p>
                 </div>
               ) : (
                 <div className="text-center">
-                  <div className="mx-auto h-12 w-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
-                    <XCircle className="h-6 w-6 text-red-600" />
+                  <div className="mx-auto h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center mb-4">
+                    {isConnected ? (
+                      <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
+                    ) : (
+                      <User className="h-6 w-6 text-blue-600" />
+                    )}
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900">Check-In Failed</h3>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    {isConnected ? 'Scanning for faces...' : 'Ready to connect'}
+                  </h3>
                   <p className="mt-1 text-sm text-gray-500">
-                    Could not verify your identity. Please try again.
+                    {isConnected ? 'Looking for registered users' : 'Click connect to start'}
                   </p>
                 </div>
               )}
@@ -431,6 +518,78 @@ export default function CheckInPage() {
             </ol>
           </div>
         </div>
+
+        {/* Reservations Popup */}
+        {showReservations && currentUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {currentUser.name}'s Reservations
+                </h2>
+                <p className="text-sm text-gray-500">{currentUser.email}</p>
+              </div>
+
+              {actionMessage && (
+                <div className={`p-3 ${actionMessage.includes('failed') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                  {actionMessage}
+                </div>
+              )}
+
+              <div className="p-4">
+                {currentUser.reservations.map((reservation) => (
+                  <div key={reservation.id} className="mb-4 last:mb-0 border border-gray-200 rounded-lg p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-medium">Room #{reservation.room_id.substring(0, 6)}</h3>
+                        <div className="text-sm text-gray-500 mt-1">
+                          <div>Check-in: {formatDate(reservation.check_in_date)}</div>
+                          <div>Check-out: {formatDate(reservation.check_out_date)}</div>
+                          <div className="capitalize">Status: {reservation.status}</div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {reservation.status === 'active' && (
+                          <Button
+                            onClick={() => handleCheckIn(reservation.id)}
+                            disabled={processing}
+                            size="sm"
+                            variant="outline"
+                          >
+                            Check In
+                          </Button>
+                        )}
+                        {reservation.status === 'checked_in' && (
+                          <Button
+                            onClick={() => handleCheckOut(reservation.id)}
+                            disabled={processing}
+                            size="sm"
+                            variant="outline"
+                          >
+                            Check Out
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-4 border-t border-gray-200 flex justify-end">
+                <Button
+                  onClick={() => {
+                    setShowReservations(false);
+                    setCurrentUser(null);
+                    connectWebSocket();
+                  }}
+                  disabled={processing}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
