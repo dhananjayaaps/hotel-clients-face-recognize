@@ -6,9 +6,11 @@ import { Room } from '@/app/types';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/app/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
-export default function RoomDetailsPage({ params }: { params: { id: string } }) {
+export default function RoomDetailsPage() {
+  const params = useParams();
+  const id = params.id;
   const { user } = useAuth();
   const router = useRouter();
   const [room, setRoom] = useState<Room | null>(null);
@@ -23,7 +25,7 @@ export default function RoomDetailsPage({ params }: { params: { id: string } }) 
   useEffect(() => {
     const fetchRoom = async () => {
       try {
-        const data = await roomsApi.getRoomDetails(params.id);
+        const data = await roomsApi.getRoomDetails(String(id ?? ''));
         setRoom(data);
       } catch (err: any) {
         setError(err.message || 'Failed to load room details. Please try again later.');
@@ -47,7 +49,7 @@ export default function RoomDetailsPage({ params }: { params: { id: string } }) 
 
     try {
       await roomsApi.createReservation({
-        room_id: params.id,
+        room_id: String(params.id),
         check_in_date: new Date(reservationData.check_in_date).toISOString(), // Format as ISO string
         check_out_date: new Date(reservationData.check_out_date).toISOString(), // Format as ISO string
         user_id: user.id,
