@@ -13,7 +13,7 @@ export default function LoginPage() {
   // Handle redirect when authentication state changes
   useEffect(() => {
     if (isAuthenticated) {
-      router.push(user?.role === 'admin' ? '/admin' : '/dashboard');
+      router.push(user?.role === 'admin' ? '/admin' : '/');
     }
   }, [isAuthenticated, user, router]);
 

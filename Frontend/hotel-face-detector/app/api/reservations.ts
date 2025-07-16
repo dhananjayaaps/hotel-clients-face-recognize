@@ -24,7 +24,7 @@ export const reservationsApi = {
   getUserReservations: async (): Promise<Reservation[]> => {
     try {
       const token = getAuthToken();
-      const response = await axios.get(`${API_BASE_URL}/api/reservations`, {
+      const response = await axios.get(`${API_BASE_URL}/api/reservations/all`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

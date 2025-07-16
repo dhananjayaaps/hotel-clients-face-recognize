@@ -220,3 +220,25 @@ async def get_user_reservations(current_user: dict = Depends(get_current_user)):
             status=res["status"] if "status" in res else "active"
         ))
     return reservations
+
+
+@router.get("/all", response_model=List[ReservationResponse])
+async def get_all_reservations(current_user: dict = Depends(get_current_user)):
+    """
+    Get all reservations (admin only)
+    """
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    db = get_database()
+    
+    reservations = []   
+    async for res in db["reservations"].find():
+        reservations.append(ReservationResponse(
+            id=str(res["_id"]),
+            room_id=res["room_id"],
+            check_in_date=res["check_in_date"],
+            check_out_date=res["check_out_date"],
+            user_id=res["user_id"],
+            status=res["status"] if "status" in res else "active"
+        ))
+    return reservations

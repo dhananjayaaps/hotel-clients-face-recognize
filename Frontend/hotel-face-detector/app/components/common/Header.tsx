@@ -18,21 +18,25 @@ const Header = () => {
         <nav className="hidden md:flex space-x-6">
           <Link href="/" className="hover:text-blue-600">Home</Link>
           <Link href="/rooms" className="hover:text-blue-600">Rooms</Link>
-          <Link href="/about" className="hover:text-blue-600">About</Link>
-          <Link href="/contact" className="hover:text-blue-600">Contact</Link>
+          <Link href="/reservations" className="hover:text-blue-600">Reservations</Link>
         </nav>
         
         <div className="flex items-center space-x-4">
           {isAuthenticated ? (
             <>
               {user?.role === 'admin' && (
-                <Link href="/admin" className="hover:text-blue-600">
-                  Admin
+                <>
+                <Link href="/admin/reservations" className="hover:text-blue-600">
+                  All Reservations
                 </Link>
+                <Link href="/admin/rooms" className="hover:text-blue-600">
+                  Rooms Manage
+                </Link>
+                <Link href="/admin/Face-Detection" className="hover:text-blue-600">
+                  CheckIn/CheckOut
+                </Link>
+                </>
               )}
-              <Link href="/dashboard" className="hover:text-blue-600">
-                Dashboard
-              </Link>
               <Button variant="outline" size="sm" onClick={logout}>
                 Logout
               </Button>
