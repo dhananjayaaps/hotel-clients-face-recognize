@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Reservation } from '@/app/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://20.169.80.3:8000';
 
 const getAuthToken = (): string => {
   if (typeof window !== 'undefined') {

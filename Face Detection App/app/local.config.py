@@ -1,7 +1,7 @@
 from pydantic import BaseSettings
 
 class Settings(BaseSettings):
-    mongo_uri: str = "mongodb://localhost:27017"
+    mongo_uri: str = "mongodb://20.169.80.3:27017"
     mongo_db_name: str = "hotel_db"
     secret_key: str = "your-secret-key"
     algorithm: str = "HS256"

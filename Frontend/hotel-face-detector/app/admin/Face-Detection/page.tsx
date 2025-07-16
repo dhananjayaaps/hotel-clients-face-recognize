@@ -109,7 +109,7 @@ export default function CheckInPage() {
     }
   };
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://20.169.80.3:8000';
 
   const handleDetection = (faces: FaceResult[]) => {
     const validFace = faces.find(face =>

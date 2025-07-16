@@ -4,12 +4,13 @@ from app.utils.security import get_current_user
 import os
 import uuid
 from pathlib import Path
+from app.config import settings
 
 router = APIRouter()
 
 # Directory to store uploaded images
 UPLOAD_DIR = "static/uploads"
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = settings.backend_url
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/upload")
