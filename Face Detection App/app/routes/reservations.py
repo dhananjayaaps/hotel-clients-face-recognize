@@ -59,11 +59,6 @@ async def check_in(
     if check_out_date.tzinfo is None:
         check_out_date = check_out_date.replace(tzinfo=timezone.utc)
     
-    if now < check_in_date:
-        raise HTTPException(status_code=400, detail="Check-in date not reached")
-    if now > check_out_date:
-        raise HTTPException(status_code=400, detail="Reservation has expired")
-    
     # Update reservation
     update_result = await db["reservations"].update_one(
         {"_id": ObjectId(request.reservation_id)},
